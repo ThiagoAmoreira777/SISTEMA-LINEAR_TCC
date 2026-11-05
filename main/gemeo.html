@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gêmeo Digital - LOTUS AMS</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #111; }
+        #info { 
+            position: absolute; 
+            top: 20px; 
+            left: 20px; 
+            color: #fff; 
+            font-family: Arial, sans-serif;
+            background: rgba(0,0,0,0.6);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .status-ligado { color: #00ff00; font-weight: bold; }
+        .status-desligado { color: #ff0000; font-weight: bold; }
+    </style>
+    <!-- Biblioteca 3D Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div id="info">
+        <h2>LOTUS AMS - Gêmeo Digital V1</h2>
+        <p>Status do Motor: <span id="motor-status" class="status-desligado">DESLIGADO</span></p>
+        <p>Posição Eixo X (Pulsos): <span id="pulsos-count">0</span></p>
+    </div>
+
+    <!-- TODO O CÓDIGO DO GEMEO.JS FICA DENTRO DA TAG SCRIPT ABAIXO -->
+    <script>
+        // 1. Configuração do Cenário 3D
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Iluminação
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 10, 7).normalize();
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x404040));
+
+        // 2. Trilho Fixo
+        const trilhoGeometry = new THREE.BoxGeometry(10, 0.2, 0.5);
+        const trilhoMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+        const trilho = new THREE.Mesh(trilhoGeometry, trilhoMaterial);
+        scene.add(trilho);
+
+        // 3. Carro Móvel (Eixo X)
+        const carroGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+        const carroMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+        const carro = new THREE.Mesh(carroGeometry, carroMaterial);
+        carro.position.y = 0.5;
+        scene.add(carro);
+
+        camera.position.set(0, 3, 8);
+        camera.lookAt(0, 0, 0);
+
+        // IP do ESP32 (Substitua pelo IP correto gerado na rede Wi-Fi)
+        // Atualize a constante com o IP retornado pelo ESP32
+        const ESP32_IP = "http://10.171.215.177/status";
+
+        // 4. Função de Atualização da Telemetria
+        async function atualizarGemeoDigital() {
+            try {
+                const response = await fetch(ESP32_IP);
+                const data = await response.json();
+
+                // Atualiza posição do carro 3D proporcional aos pulsos
+                carro.position.x = (data.pulsos * 0.05) - 4;
+
+                const statusElement = document.getElementById("motor-status");
+                if (data.motor === 1) {
+                    carro.material.color.setHex(0x00ff00);
+                    statusElement.innerText = "LIGADO";
+                    statusElement.className = "status-ligado";
+                } else {
+                    carro.material.color.setHex(0xff0000);
+                    statusElement.innerText = "DESLIGADO";
+                    statusElement.className = "status-desligado";
+                }
+
+                document.getElementById("pulsos-count").innerText = data.pulsos;
+            } catch (err) {
+                // Falha silenciosa caso o ESP32 esteja offline
+                console.error("Erro ao buscar dados do ESP32:", err);
+            }
+        }
